@@ -1,4 +1,4 @@
-import { VNodeFlags, ChildrenFlags } from './vnode.js';
+import { VNodeFlags, ChildrenFlags } from './flags.js';
 
 // Fragment唯一标识
 export const Fragment = Symbol();
@@ -58,7 +58,7 @@ export function h(tag, data=null, children=null) {
   }
 }
 
-function createTextVNode(text) {
+export function createTextVNode(text) {
   return {
     _isVNode: true,
     flags: VNodeFlags.TEXT,

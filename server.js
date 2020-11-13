@@ -3,7 +3,7 @@ const path = require('path')
 const serve = require('koa-static')
 const app = new Koa();
 
-const index = serve(path.join(__dirname) + '/vue-dev')
+const index = serve(path.join(__dirname) + '/src')
 
 app.use(index)
 app.listen(8000)
