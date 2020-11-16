@@ -101,9 +101,7 @@ function mountText(vnode, container) {
 }
 
 function mountFragment(vnode, container, isSVG) {
-  console.log('挂载 fragment')
   const { children, childFlags } = vnode;
-  console.log(children, childFlags)
   switch(childFlags) {
     case ChildrenFlags.SINGLE_VNODE:
       // 如果children是单个子节点，直接挂载
@@ -153,9 +151,19 @@ function mountComponent(vnode, container, isSVG) {
 
 function mountStatefulComponent(vnode, container, isSVG) {
   const instance = new vnode.tag();
-  instance.$vnode = instance.render();
-  mount(instance.$vnode, container, isSVG);
-  instance.$el = vnode.el = instance.$vnode.el;
+
+  instance._update = function() {
+    // 渲染VNode
+    instance.$vnode = instance.render();
+    // 挂载
+    mount(instance.$vnode, container, isSVG);
+    // el属性值和组件实例的$el属性都引用组件的根dom元素
+    instance.$el = vnode.el = instance.$vnode.el;
+    
+    instance.mounted && instance.mounted()
+  }
+
+  instance._update();
 }
 
 function mountFunctionalComponent(vnode, container, isSVG) {

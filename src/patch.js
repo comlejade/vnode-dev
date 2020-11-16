@@ -1,12 +1,12 @@
-import { VNodeFlags } from "./flags"
-import { mount } from "./mount"
+import { ChildrenFlags, VNodeFlags } from "./flags.js"
+import { mount } from "./mount.js"
 
 export function patch(prevVNode, nextVNode, container) {
   const nextFlags = nextVNode.flags
   const prevFlags = prevVNode.flags
 
   // 检查VNode类型是否相同，类型不同直接replace；类型相同，则根据不同类型调用不同函数
-  if (prevFlags !=== nextFlags) {
+  if (prevFlags !== nextFlags) {
     replaceVNode(prevVNode, nextVNode, container)
   } else if (nextFlags & VNodeFlags.ELEMENT) {
     patchElement(prevVNode, nextVNode, container)
@@ -56,6 +56,15 @@ function patchElement(prevVNode, nextVNode, container) {
       }
     }
   }
+
+  // patchChildren 递归更新子节点
+  patchChildren(
+    prevVNode.childFlags,
+    nextVNode.childFlags,
+    prevVNode.children,
+    nextVNode.children,
+    el
+  )
 }
 
 function classStringify(cls) {
@@ -106,5 +115,133 @@ export function patchData(el, key, prevValue, nextValue) {
       } else {
         el.setAttribute(key, value)
       }
+  }
+}
+
+function patchChildren(prevChildFlags, nextChildFlags, prevChildren, nextChildren, container) {
+  switch (prevChildFlags) {
+    // 旧的 children 是单个子节点
+    case ChildrenFlags.SINGLE_VNODE:
+      switch (nextChildFlags) {
+        case ChildrenFlags.SINGLE_VNODE:
+          // 新的 children 也是单个子节点时，会执行该 case 语句块
+          patch(prevChildren, nextChildren, container)
+          break
+        case ChildrenFlags.NO_CHILDREN:
+          // 新的 children 中没有子节点时，会执行该 case 语句
+          container.removeChild(prevChildren.el)
+          break
+        default:
+          //  新的 children 有多个子节点
+          // 移除旧的单个子节点
+          container.removeChild(prevChildren.el)
+          // 遍历新的多个子节点，逐个挂载到容器中
+          for (let i = 0; i < nextChildren.length; i++) {
+            mount(nextChildren[i], container)
+          }
+          break
+      }
+      break
+    // 旧的 children 中没有子节点
+    case ChildrenFlags.NO_CHILDREN:
+      switch (nextChildFlags) {
+        case ChildrenFlags.SINGLE_VNODE:
+          // 新的 children 是单个子节点时
+          mount(nextChildren, container)
+          break
+        case ChildrenFlags.NO_CHILDREN:
+          // 新的 children 中没有子节点
+          break
+        default:
+          // 新的 children 中有多个子节点
+          for (let i = 0; i < nextChildren.length; i++) {
+            mount(nextChildren[i], container)
+          }
+          break
+      }
+      break
+    default:
+      switch (nextChildFlags) {
+        case ChildrenFlags.SINGLE_VNODE:
+          // 新的 children 是单个子节点
+          for (let i = 0; i < prevChildren.length; i++) {
+            container.removeChild(prevChildren[i].el)
+          }
+          mount(nextChildren, container)
+          break
+        case ChildrenFlags.NO_CHILDREN:
+          // 新的 children 没有子节点
+          for (let i = 0; i < prevChildren.length; i++) {
+            container.removeChild(prevChildren[i].el)
+          }
+          break
+        default:
+          // 新的 children 中有多个子节点
+          for (let i = 0; i < prevChildren.length; i++) {
+            container.removeChild(prevChildren[i].el)
+          }
+          for (let i = 0; i < nextChildren.length; i++) {
+            mount(nextChildren[i], container)
+          }
+          break
+      }
+  }
+}
+
+function patchText(prevVNode, nextVNode) {
+  const el = (nextVNode.el = prevVNode.el)
+  if (nextVNode.children !== prevVNode.children) {
+    el.nodeValue = nextVNode.children
+  }
+}
+
+function patchFragment(prevVNode, nextVNode, container) {
+  patchChildren(
+    prevVNode.childFlags, 
+    nextVNode.childFlags, 
+    prevVNode.children,
+    nextVNode.children,
+    container
+  )
+
+  switch (nextVNode.childFlags) {
+    case ChildrenFlags.SINGLE_VNODE:
+      nextVNode.el = nextVNode.children.el
+      break
+    case ChildrenFlags.NO_CHILDREN:
+      nextVNode.el = prevVNode.el
+    default:
+      nextVNode.el = nextVNode.children[0].el
+  }
+}
+
+function patchPortal(prevVNode, nextVNode) {
+  patchChildren(
+    prevVNode.childFlags,
+    nextVNode.childFlags,
+    prevVNode.children,
+    nextVNode.children,
+    prevVNode.tag
+  )
+
+  nextVNode.el = prevVNode.el
+
+  // 如果新旧容器不同，需要搬运
+  if (nextVNode.tag !== prevVNode.tag) {
+    const container = typeof nextVNode.tag === 'string'
+      ? document.querySelector(nextVNode.tag)
+      : nextVNode.tag
+
+    switch (nextVNode.childFlags) {
+      case ChildrenFlags.SINGLE_VNODE:
+        container.appendChild(nextVNode.children.el)
+        break
+      case ChildrenFlags.NO_CHILDREN:
+        break
+      default:
+        for (let i = 0; i < nextVNode.children.length; i++) {
+          container.appendChild(nextVNode.children[i].el)
+        }
+    }
   }
 }

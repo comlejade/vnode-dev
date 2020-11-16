@@ -1,4 +1,5 @@
 import { mount } from './mount.js'
+import { patch } from './patch.js'
 
 function render(vnode, container) {
   const prevVNode = container.vnode
