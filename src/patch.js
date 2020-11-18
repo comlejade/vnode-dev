@@ -24,6 +24,11 @@ export function patch(prevVNode, nextVNode, container) {
 function replaceVNode(prevVnode, nextVnode, container) {
 
   container.removeChild(prevVnode.el)
+  // 如果被移除的VNode是组件，需要调用组件实例的unmounted钩子
+  if (prevVnode.flags & VNodeFlags.COMPONENT_STATEFUL_NORMAL) {
+    const instance = prevVnode.children
+    instance.unmounted && instance.unmounted()
+  }
 
   mount(nextVnode, container)
 }
@@ -243,5 +248,30 @@ function patchPortal(prevVNode, nextVNode) {
           container.appendChild(nextVNode.children[i].el)
         }
     }
+  }
+}
+
+function patchComponent(prevVNode, nextVNode, container) {
+  if (nextVNode.tag !== prevVNode.tag) {  // 判断是否是相同组件
+    replaceVNode(prevVNode, nextVNode, container)
+  }
+  // 检查组件是否是有状态组件
+   else if (nextVNode.flags & VNodeFlags.COMPONENT_STATEFUL_NORMAL) {
+    // 获取组件实例
+    const instance = (nextVNode.children = prevVNode.children)
+    // 更新props
+    instance.$props = nextVNode.data
+    // 更新组件
+    instance._update()
+  } else {
+    // 更新函数式组件
+    // 通过 prevVNode.handle 拿到 handle 对象
+    const handle = (nextVNode.handle = prevVNode.handle)
+    // 更新 handle 对象
+    handle.prev = prevVNode
+    handle.next = nextVNode
+    handle.container = container
+
+    handle.update();
   }
 }

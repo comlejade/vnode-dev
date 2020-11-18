@@ -1,5 +1,6 @@
 import { ChildrenFlags, VNodeFlags } from './flags.js'
 import { createTextVNode } from './h.js'
+import { patch } from './patch.js'
 
 export function mount(vnode, container, isSVG) {
   const { flags } = vnode
@@ -150,24 +151,65 @@ function mountComponent(vnode, container, isSVG) {
 }
 
 function mountStatefulComponent(vnode, container, isSVG) {
-  const instance = new vnode.tag();
+  const instance = (vnode.children = new vnode.tag());
+
+  instance.$props = vnode.data
 
   instance._update = function() {
-    // 渲染VNode
-    instance.$vnode = instance.render();
-    // 挂载
-    mount(instance.$vnode, container, isSVG);
-    // el属性值和组件实例的$el属性都引用组件的根dom元素
-    instance.$el = vnode.el = instance.$vnode.el;
-    
-    instance.mounted && instance.mounted()
+    if (instance._mounted) {  // 检查 instance._mounted 是否初次加载
+      // 如果为真则不是初次加载
+      // 拿到旧的VNode
+      const prevVNode = instance.$vnode
+      // 重渲染新的VNode
+      const nextVNode = (instance.$vnode = instance.render())
+      // patch更新
+      patch(prevVNode, nextVNode, prevVNode.el.parentNode)
+      // 更新vnode.el 和 $el
+      instance.$el = vnode.el = instance.$vnode.el
+    } else {
+      // 渲染VNode
+      instance.$vnode = instance.render();
+      // 挂载
+      mount(instance.$vnode, container, isSVG);
+
+      // 组件已挂载
+      instance._mounted = true
+
+      // el属性值和组件实例的$el属性都引用组件的根dom元素
+      instance.$el = vnode.el = instance.$vnode.el;
+      
+      instance.mounted && instance.mounted()
+    }
   }
 
   instance._update();
 }
 
 function mountFunctionalComponent(vnode, container, isSVG) {
-  const $vonde = vnode.tag()
-  mount($vonde, container, isSVG)
-  vnode.el = $vonde.el
+  vnode.handle = {
+    prev: null,
+    next: vnode,
+    container,
+    update: () => {
+      if (vnode.handle.prev) {
+        // 更新
+        const prevVNode = vnode.handle.prev
+        const nextVNode = vnode.handle.next
+
+        const prevTree = prevVNode.children
+        const props = nextVNode.data
+        const nextTree = (nextVNode.children = nextVNode.tag(props))
+
+        patch(prevTree, nextTree, vnode.handle.container)
+      } else {
+        // 初次加载
+        const props = vnode.data
+        const $vonde = (vnode.children = vnode.tag(props)) 
+        mount($vonde, container, isSVG)
+        vnode.el = $vonde.el
+      }
+    }
+  }
+
+  vnode.handle.update()
 }

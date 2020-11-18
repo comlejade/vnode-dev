@@ -1,17 +1,28 @@
 import { Fragment, h, Portal } from './h.js'
 import render from './render.js'
 
-const prevVNode = h(Fragment, null, [
-  h('p', null, '旧片段1'),
-  h('div', null, '旧片段2')
-])
-const nextVNode = h(Fragment , null, [
-  h('h1', null, '新片段1'),
-  h('h2', null, '新片段2')
-])
+class ChildComponent {
+  render() {
+    return h('div', null, this.$props.text)
+  }
+}
 
-render(prevVNode, document.getElementById('app'))
+class ParentComponent {
+  localState = 'one'
 
-setTimeout(() => {
-  render(nextVNode, document.getElementById('app'))
-}, 5000)
+  render() {
+    return h(ChildComponent, {
+      text: this.localState
+    })
+  }
+}
+
+const compVNode = h(ParentComponent)
+
+render(compVNode, document.getElementById('app'))
+
+// render(prevVNode, document.getElementById('app'))
+
+// setTimeout(() => {
+//   render(nextVNode, document.getElementById('app'))
+// }, 5000)
