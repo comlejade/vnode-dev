@@ -118,7 +118,7 @@ export function patchData(el, key, prevValue, nextValue) {
       } else if (domPropsRE.test(key)) {
         el[key] = nextValue
       } else {
-        el.setAttribute(key, value)
+        el.setAttribute(key, nextValue)
       }
   }
 }
@@ -181,12 +181,134 @@ function patchChildren(prevChildFlags, nextChildFlags, prevChildren, nextChildre
           }
           break
         default:
-          // 新的 children 中有多个子节点
-          for (let i = 0; i < prevChildren.length; i++) {
-            container.removeChild(prevChildren[i].el)
+          let j = 0;
+          let preVNode = prevChildren[j];
+          let nextVNode = nextChildren[j];
+          let prevEnd = prevChildren.length - 1;
+          let nextEnd = nextChildren.length - 1;
+          outer: {
+            // 从前向后遍历
+            while(prevVNode.key === nextVNode.key) {
+              patch(prevVNode, nextVNode, container);
+              j++;
+              if (j > prevEnd || j > nextEnd) {
+                break outer
+              }
+              prevVNode = prevChildren[j];
+              nextVNode = nextChildren[j];
+            }
+
+            prevVNode = prevChildren[prevEnd];
+            nextVNode = nextChildren[nextEnd];
+  
+            // 从后向前遍历
+            while(prevVNode.key === nextVNode.key) {
+              patch(prevVNode, nextVNode, container);
+              prevEnd--;
+              nextEnd--;
+              if (j > prevEnd || j > nextEnd) {
+                break outer
+              }
+              prevVNode = prevChildren[prevEnd];
+              nextVNode = nextChildren[nextEnd];
+            }
           }
-          for (let i = 0; i < nextChildren.length; i++) {
-            mount(nextChildren[i], container)
+
+          // 对比j, prevEnd, nextEnd的值；nextEnd大，说明有新元素要加入；preEnd大，说明有旧元素要删除
+          if (j > prevEnd && j <= nextEnd) {
+            // nextEnd大，有新元素加入
+            const nextPos = nextEnd + 1;
+            const refNode = nextPos < nextChildren.length ? nextChildren[nextPos].el : null;
+
+            while(j <= nextEnd) {
+              mount(nextChildren[j++], container, false, refNode)
+            }
+          } else if (j > nextEnd) {
+            // preVNode大说明需要移除元素
+            while (j <= preVNode) {
+              container.removeChild(prevChildren{j++}.el)
+            }
+          } else {
+            const nextLeft = nextEnd - j + 1
+            const source = []
+            for (let i = 0; i < nextLeft; i++) {
+                .push(-1)
+            }
+            const prevStart = j;
+            const nextStart = j;
+            let moved = false;
+            let pos = 0;
+            let patched = 0;
+            // 构建索引表
+            const keyIndex = {};
+            for (let i = nextStart; i <= nextEnd; i++) {
+              keyIndex[nextChildren[i].key] = i
+            }
+            
+            for (let i = prevStart; i <= prevEnd; i++) {
+              const prevVNode = prevChildren[i];
+
+              if (patched < nextLeft) {
+                const k = keyIndex[prevVNode.key];
+  
+                if (typeof k !== 'undefined') {
+                  const nextVNode = nextChildren[k]
+                  patch(prevVNode, nextVNode, container);
+                  patched++
+                  source[k - nextStart] = i
+  
+                  if (k < pos) {
+                    moved = true
+                  } else {
+                    pos = k
+                  }
+                } else {
+                  container.removeChild(prevVNode.el)
+                }
+                
+              } else {
+                container.removeChild(prevVNode.el)
+              }
+              if (moved) {
+                const seq = lis(source)
+                // j 指向最长递增子序列的最后一个值
+                let j = seq.length - 1
+                // 从后向前遍历新 children 中的剩余未处理节点
+                for (let i = nextLeft - 1; i >= 0; i--) {
+                  if (source[i] === -1) {
+                    // 作为全新的节点挂载
+                    // 该节点在新children中的真实位置索引
+                    const pos = i + nextStart
+                    const nextVNode = nextChildren[pos]
+                    // 该节点点下一个节点的位置索引
+                    const nextPos = pos + 1
+                    mount(
+                      nextVNode,
+                      container,
+                      false,
+                      nextPos < nextChildren.length
+                      ? nextChildren[nextPos].el
+                      : null
+                    )
+                  } else if (i !== seq[i]) {
+                    // 说明该节点需要移动
+                    // 该节点在新children中的真实位置
+                    const pos = i + nextStart
+                    const nextVNode = nextChildren[pos]
+                    // 该节点下一个节点的位置索引
+                    const nextPos = pos + 1
+                    // 移动
+                    container.insertBefore(
+                      nextVNode.el,
+                      nextPos < nextChildren.length
+                      ? nextChildren[nextPos].el
+                      : null
+                    )
+                  } else {
+                    j--
+                  }
+                }
+              }
           }
           break
       }
@@ -274,4 +396,46 @@ function patchComponent(prevVNode, nextVNode, container) {
 
     handle.update();
   }
+}
+
+function lis(seq) {
+  const valueToMax = {}
+  let len = seq.length
+  for (let i = 0; i < len; i++) {
+    valueToMax[seq[i]] = 1
+  }
+
+  let i = len - 1
+  let last = seq[i]
+  let prev = seq[i - 1]
+  while (typeof prev !== 'undefined') {
+    let j = 1
+    while (j < len) {
+      last = seq[j]
+      if (prev < last) {
+        const currentMax = valueToMax[last] + 1
+        valueToMax[prev] = valueToMax[prev] !== 1
+        ? valueToMax[prev] > currentMax
+          ? valueToMax[prev]
+          : currentMax
+        : currentMax
+      }
+      j++
+    }
+    i--
+    last = seq[i]
+    prev = seq[i - 1]
+
+  }
+
+  const lis = []
+  i = 1
+  while (--len >= 0) {
+    const n = seq[len]
+    if (valueToMax[n] === i) {
+      i++
+      lis.unshift(len)
+    }
+  }
+  return lis
 }

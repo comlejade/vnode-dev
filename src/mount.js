@@ -2,11 +2,11 @@ import { ChildrenFlags, VNodeFlags } from './flags.js'
 import { createTextVNode } from './h.js'
 import { patch } from './patch.js'
 
-export function mount(vnode, container, isSVG) {
+export function mount(vnode, container, isSVG, refNode) {
   const { flags } = vnode
   if (flags & VNodeFlags.ELEMENT) {
     // 挂载普通标签
-    mountElement(vnode, container, isSVG)
+    mountElement(vnode, container, isSVG, refNode)
   } else if (flags & VNodeFlags.COMPONENT) {
     // 挂在组件
     mountComponent(vnode, container, isSVG)
@@ -41,7 +41,7 @@ function classStringify(cls) {
 }
 
 const domPropsRE = /[A-Z]|^(?:value|chcked|selected|muted)$/
-function mountElement(vnode, container, isSVG) {
+function mountElement(vnode, container, isSVG, refNode) {
   isSVG = isSVG || vnode.flags & VNodeFlags.ELEMENT_SVG
   const el = isSVG 
     ? document.createElementNS('http://www.w3.org/2000/svg', vnode.tag)
@@ -92,7 +92,7 @@ function mountElement(vnode, container, isSVG) {
     }
   }
 
-  container.appendChild(el)
+  refNode ? container.insertBefore(el, refNode) : container.appendChild(el)
 }
 
 function mountText(vnode, container) {
